@@ -1,14 +1,20 @@
 {
-  "name": "scheduler",
-  "module": "index.ts",
-  "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
-  }
+	"name": "scheduler",
+	"module": "index.ts",
+	"type": "module",
+	"scripts": {
+		"lint": "bunx biome lint --write .",
+		"format": "bunx biome format --write .",
+		"check": "bunx biome check --write ."
+	},
+	"workspaces": [
+		"packages/*"
+	],
+	"devDependencies": {
+		"@biomejs/biome": "2.0.6",
+		"@types/bun": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	}
 }
