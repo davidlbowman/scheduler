@@ -1,15 +1,4 @@
-# scheduler
+# Scheduler - Self-Hosted Calendly Alternative
 
-To install dependencies:
+A modern, self-hosted scheduling platform built with Bun, Effect-TS, and React. Our goal is to create a fully type-safe, composable scheduling solution that gives users complete control over their data while providing seamless Google Calendar integration. The project emphasizes Effect's powerful service architecture for building maintainable, testable applications with explicit error handling and dependency management.
 
-```bash
-bun install
-```
-
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.2.18. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
