@@ -5,7 +5,10 @@
 	"scripts": {
 		"lint": "bunx biome lint --write .",
 		"format": "bunx biome format --write .",
-		"check": "bunx biome check --write ."
+		"check": "bun run --filter backend check",
+		"typecheck": "bun run --filter backend typecheck",
+		"dev": "bun run --filter backend dev",
+		"test": "bun run --filter backend test"
 	},
 	"workspaces": [
 		"packages/*"

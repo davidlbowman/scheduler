@@ -1,0 +1,21 @@
+{
+	"name": "backend",
+	"module": "index.ts",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "bun run --watch index.ts",
+		"check": "bunx biome check --write .",
+		"typecheck": "bunx tsc --noEmit",
+		"test": "bun test"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"dependencies": {
+		"effect": "^3.16.12"
+	}
+}
