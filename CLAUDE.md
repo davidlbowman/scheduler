@@ -104,35 +104,35 @@ export class ConfigService extends Effect.Service<ConfigService>()(
   }
 ) {}
 
-// Define service with effect for complex initialization
-export class DatabaseService extends Effect.Service<DatabaseService>()(
-  "app/DatabaseService",
+// Define service that returns a layer directly
+import { NodeSdk } from "@effect/opentelemetry"
+import { ConsoleSpanExporter, BatchSpanProcessor } from "@opentelemetry/sdk-trace-base"
+
+export class TelemetryService extends Effect.Service<TelemetryService>()(
+  "app/TelemetryService",
   {
     effect: Effect.gen(function* () {
-      // Mock implementation for prototype
-      const getUser = (id: string) => 
-        Effect.succeed({ id, name: "Mock User", email: "mock@example.com" })
+      const config = yield* ConfigService
       
-      const saveEvent = (event: CalendarEvent) =>
-        Effect.gen(function* () {
-          yield* Effect.log(`Would save event: ${event.title}`)
-        })
-      
-      return { getUser, saveEvent } as const
+      // Return the telemetry layer directly
+      return NodeSdk.layer(() => ({
+        resource: { serviceName: config.getAppName() },
+        spanProcessor: new BatchSpanProcessor(new ConsoleSpanExporter())
+      }))
     }),
-    dependencies: [ConfigService.Default] // Specify service dependencies
+    dependencies: [ConfigService.Default]
   }
 ) {}
 
 // Use the auto-generated layers
 const MainLive = Layer.mergeAll(
   ConfigService.Default,
-  DatabaseService.Default,
-  // other services...
+  TelemetryService.Default
 )
 ```
 
 **Service Constructor Options:**
+
 - `sync: () => implementation` - For simple synchronous services
 - `effect: Effect.gen(...)` - For services requiring initialization
 - `succeed: implementation` - For static implementations
@@ -215,6 +215,73 @@ export class ValidationError extends Schema.TaggedError<ValidationError>()(
 ) {}
 ```
 
+### Telemetry Patterns
+
+For prototype telemetry, use Effect's built-in tracing with ConsoleSpanExporter:
+
+```ts
+// Create a telemetry service that returns a layer directly
+import { NodeSdk } from "@effect/opentelemetry"
+import { ConsoleSpanExporter, BatchSpanProcessor } from "@opentelemetry/sdk-trace-base"
+
+export class TelemetryService extends Effect.Service<TelemetryService>()(
+  "app/TelemetryService",
+  {
+    effect: Effect.gen(function* () {
+      const config = yield* ConfigService
+      
+      return NodeSdk.layer(() => ({
+        resource: { serviceName: config.getAppName() },
+        spanProcessor: new BatchSpanProcessor(new ConsoleSpanExporter())
+      }))
+    }),
+    dependencies: [ConfigService.Default]
+  }
+) {}
+
+// Use Effect.withSpan directly in application code
+const program = Effect.gen(function* () {
+  const config = yield* ConfigService
+  
+  const result = yield* Effect.gen(function* () {
+    yield* Effect.annotateCurrentSpan("appName", config.getAppName())
+    yield* Effect.annotateCurrentSpan("version", config.getVersion())
+    
+    yield* Effect.log(`Starting ${config.getAppName()}`)
+    
+    return "Application started successfully"
+  }).pipe(
+    Effect.withSpan("app-startup", {
+      attributes: {
+        "app.operation": "startup",
+        "app.name": config.getAppName(),
+        "app.version": config.getVersion()
+      }
+    })
+  )
+  
+  return result
+})
+
+// Provide telemetry layer to the program
+Effect.gen(function* () {
+  const telemetryLayer = yield* TelemetryService
+  const result = yield* program.pipe(Effect.provide(telemetryLayer))
+  return result
+}).pipe(
+  Effect.provide(MainLive),
+  Effect.runPromise
+)
+```
+
+**Key Telemetry Patterns:**
+
+- Services can return layers directly for cleaner composition
+- Use `Effect.withSpan(name, options)` for creating spans with attributes
+- Use `Effect.annotateCurrentSpan(key, value)` for runtime annotations
+- ConsoleSpanExporter outputs span data to console for development
+- Log messages automatically become span events
+
 ## Project Structure
 
 ```
@@ -243,6 +310,7 @@ scheduler/
 ## Workspace Scripts
 
 **Root level scripts** (delegate to packages via `--filter`):
+
 - `bun dev` → `bun run --filter backend dev`
 - `bun test` → `bun run --filter backend test`
 - `bun test:coverage` → `bun run --filter backend test:coverage`
@@ -295,6 +363,7 @@ Bun.serve({
 ## Testing
 
 ### Structure
+
 - Tests are located in `src/tests/` directory
 - One test file per service: `ServiceName.test.ts`
 - Use prototype layers for testing (no separate test layers)
@@ -302,6 +371,7 @@ Bun.serve({
 ### Patterns
 
 #### Basic Service Test
+
 ```ts
 import { expect, test, describe } from "bun:test"
 import { Effect } from "effect"
@@ -325,6 +395,7 @@ describe("ServiceName", () => {
 ```
 
 #### Error Testing with Effect.flip
+
 ```ts
 test("should handle errors with Effect.flip", async () => {
   const program = Effect.gen(function* () {
@@ -342,6 +413,7 @@ test("should handle errors with Effect.flip", async () => {
 ```
 
 ### Rules
+
 1. **Use Effect.flip for error testing** (NOT Effect.either)
 2. **Tests use prototype layers directly** (ServiceName.Default)
 3. **Use ParseResult.isParseError(result)** for schema validation errors
@@ -349,6 +421,7 @@ test("should handle errors with Effect.flip", async () => {
 5. **One test file per service**
 
 ### Scripts
+
 - `bun test` - Run all tests
 - `bun test:watch` - Run tests in watch mode  
 - `bun test:coverage` - Run tests with coverage report
@@ -396,36 +469,60 @@ Always use `Effect.runPromise` or `Effect.runFork` at the application boundary:
 
 ```ts
 // Main application entry point - packages/backend/index.ts
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import { ConfigService } from "./src/services/ConfigService.js"
+import { TelemetryService } from "./src/services/TelemetryService.js"
 
 const program = Effect.gen(function* () {
   const config = yield* ConfigService
   
-  yield* Effect.log(`Starting ${config.getAppName()} v${config.getVersion()}`)
-  yield* Effect.log(`Environment: ${config.getEnvironment()}`)
+  const result = yield* Effect.gen(function* () {
+    yield* Effect.annotateCurrentSpan("appName", config.getAppName())
+    yield* Effect.annotateCurrentSpan("version", config.getVersion())
+    yield* Effect.annotateCurrentSpan("environment", config.getEnvironment())
+    
+    yield* Effect.log(`Starting ${config.getAppName()} v${config.getVersion()}`)
+    yield* Effect.log(`Environment: ${config.getEnvironment()}`)
+    
+    return "Application started successfully"
+  }).pipe(
+    Effect.withSpan("app-startup", {
+      attributes: {
+        "app.operation": "startup",
+        "app.name": config.getAppName(),
+        "app.version": config.getVersion(),
+        "app.environment": config.getEnvironment()
+      }
+    })
+  )
   
-  return "Application started successfully"
+  return result
 })
 
-// Build the complete layer with all services
-const MainLive = ConfigService.Default
+const MainLive = Layer.mergeAll(
+  ConfigService.Default,
+  TelemetryService.Default
+)
 
-// Run the program with proper error handling
-Effect.runPromise(
-  program.pipe(
-    Effect.provide(MainLive),
-    Effect.catchAllCause(Effect.logError)
-  )
+// Get the telemetry layer and provide it to the main program
+Effect.gen(function* () {
+  const telemetryLayer = yield* TelemetryService
+  const result = yield* program.pipe(Effect.provide(telemetryLayer))
+  return result
+}).pipe(
+  Effect.provide(MainLive),
+  Effect.catchAllCause(Effect.logError),
+  Effect.runPromise
 ).then(console.log)
 ```
 
 **Key Patterns:**
+
 - Use `Effect.gen` for readable async flow
-- Build layers with `ServiceName.Default` for prototype
+- Build layers with `Layer.mergeAll` and `ServiceName.Default`
+- Services can yield other services and return layers directly
 - Use `Effect.provide(MainLive)` to inject all services
 - Always include `Effect.catchAllCause(Effect.logError)` for error handling
-- Use `Effect.runPromise().then()` for final execution
+- Use `Effect.runPromise` at the application boundary
 
 For more Bun-specific information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
-
