@@ -14,6 +14,56 @@ This is a self-hosted scheduling application built with Bun, Effect-TS, and Reac
 - **Database**: SQLite via bun:sqlite
 - **Monorepo**: Bun workspaces
 
+## Current Development Status
+
+### ✅ Completed
+- **ConfigService**: Basic configuration with sync constructor (app name, version, environment)
+- **TelemetryService**: ConsoleSpanExporter for prototype telemetry, depends on ConfigService
+- **Testing Infrastructure**: Bun test setup with >80% coverage requirement
+- **Project Structure**: Monorepo with workspace scripts and proper Effect patterns
+
+### 🚧 In Progress: Initialization & Environment Variables
+
+**Goal**: Set up type-safe environment variable loading and CLI helper for `.env` generation.
+
+**The Flow**:
+```bash
+# 1. Clone repo and setup
+git clone scheduler && cd scheduler
+bun install
+
+# 2. Run CLI helper to create .env with OAuth credentials  
+bun run init
+
+# 3. Start main application (reads .env)
+bun dev
+```
+
+**Architecture**:
+- **ConfigService**: Extend to use `Config.string()` for type-safe env vars with fallbacks
+- **CLI Helper**: Separate entry point (`packages/backend/init.ts`) that prompts for OAuth credentials and writes `.env`
+- **Environment Variables**: Google OAuth credentials, app configuration
+
+### 🎯 Next Steps
+
+1. **Update ConfigService** - Add type-safe environment variable loading:
+   ```ts
+   const googleClientId = yield* Config.string("GOOGLE_CLIENT_ID")
+     .pipe(Config.withDefault("mock_client_id_for_development"))
+   const googleClientSecret = yield* Config.redacted("GOOGLE_CLIENT_SECRET")
+     .pipe(Config.withDefault("mock_secret_for_development")) 
+   ```
+
+2. **Create CLI Helper** - Build `init.ts` with Effect CLI for interactive OAuth setup
+
+3. **Service Layer Progression**:
+   - GoogleOAuthService (mock OAuth flow)
+   - GoogleCalendarService (mock calendar operations) 
+   - SchedulerService (core booking logic)
+   - HTTP API Service (booking endpoints)
+
+**Current Focus**: Solving the bootstrapping problem - how to get OAuth credentials into the app in a type-safe way without circular dependencies.
+
 ## Bun-Specific Guidelines
 
 Default to using Bun instead of Node.js.
