@@ -91,9 +91,20 @@ Use `Effect.Service` for cleaner service definitions with built-in layer generat
 
 ```ts
 import { Effect } from "effect"
-import { Schema } from "@effect/schema"
 
-// Define service with Effect.Service
+// Define service with Effect.Service using sync for simple values
+export class ConfigService extends Effect.Service<ConfigService>()(
+  "app/ConfigService",
+  {
+    sync: () => ({
+      getAppName: () => "Scheduler",
+      getVersion: () => "1.0.0-prototype",
+      getEnvironment: () => "development"
+    })
+  }
+) {}
+
+// Define service with effect for complex initialization
 export class DatabaseService extends Effect.Service<DatabaseService>()(
   "app/DatabaseService",
   {
@@ -109,16 +120,23 @@ export class DatabaseService extends Effect.Service<DatabaseService>()(
       
       return { getUser, saveEvent } as const
     }),
-    dependencies: [] // Add dependencies here when needed
+    dependencies: [ConfigService.Default] // Specify service dependencies
   }
 ) {}
 
 // Use the auto-generated layers
 const MainLive = Layer.mergeAll(
+  ConfigService.Default,
   DatabaseService.Default,
   // other services...
 )
 ```
+
+**Service Constructor Options:**
+- `sync: () => implementation` - For simple synchronous services
+- `effect: Effect.gen(...)` - For services requiring initialization
+- `succeed: implementation` - For static implementations
+- `scoped: Effect.gen(...)` - For services with lifecycle management
 
 **Note**: For services without sensible defaults (e.g., contextual services), use `Context.GenericTag` instead.
 
@@ -205,8 +223,10 @@ scheduler/
 │   ├── backend/           # Effect-TS backend services
 │   │   ├── src/
 │   │   │   ├── services/  # Effect service layers
+│   │   │   ├── tests/     # Service tests
 │   │   │   ├── api/       # HTTP API definitions
-│   │   │   └── main.ts    # Entry point
+│   │   │   └── schemas/   # Shared schemas
+│   │   ├── index.ts       # Entry point
 │   │   └── package.json
 │   ├── frontend/          # React frontend
 │   │   ├── src/
@@ -215,8 +235,19 @@ scheduler/
 │   │   └── package.json
 │   └── shared/            # Shared types and schemas
 │       └── src/
+├── biome.json             # Linter configuration
+├── package.json           # Root workspace config
 └── docker-compose.yml
 ```
+
+## Workspace Scripts
+
+**Root level scripts** (delegate to packages via `--filter`):
+- `bun dev` → `bun run --filter backend dev`
+- `bun test` → `bun run --filter backend test`
+- `bun test:coverage` → `bun run --filter backend test:coverage`
+- `bun check` → `bun run --filter backend check`
+- `bun typecheck` → `bun run --filter backend typecheck`
 
 ## Frontend with Bun
 
@@ -263,31 +294,64 @@ Bun.serve({
 
 ## Testing
 
-Use `bun test` with Effect's testing utilities:
+### Structure
+- Tests are located in `src/tests/` directory
+- One test file per service: `ServiceName.test.ts`
+- Use prototype layers for testing (no separate test layers)
 
+### Patterns
+
+#### Basic Service Test
 ```ts
+import { expect, test, describe } from "bun:test"
 import { Effect } from "effect"
-import { describe, test, expect } from "bun:test"
+import { ServiceName } from "../services/ServiceName.js"
 
-describe("BookingService", () => {
-  test("should create booking", async () => {
-    const result = await Effect.gen(function* () {
-      const booking = yield* BookingService
-      const event = yield* booking.create({
-        guestEmail: "guest@example.com",
-        startTime: new Date(),
-        duration: 30
-      })
-      return event
-    }).pipe(
-      Effect.provide(BookingService.Default),
-      Effect.runPromise
+describe("ServiceName", () => {
+  test("should do something", async () => {
+    const program = Effect.gen(function* () {
+      const service = yield* ServiceName
+      const result = yield* service.method(params)
+      return result
+    })
+
+    const result = await Effect.runPromise(
+      program.pipe(Effect.provide(ServiceName.Default))
     )
-    
-    expect(result.id).toBeDefined()
+
+    expect(result).toBe(expected)
   })
 })
 ```
+
+#### Error Testing with Effect.flip
+```ts
+test("should handle errors with Effect.flip", async () => {
+  const program = Effect.gen(function* () {
+    const service = yield* ServiceName
+    const result = yield* service.method(invalidParams)
+    return result
+  })
+
+  const result = await Effect.runPromise(
+    program.pipe(Effect.provide(ServiceName.Default), Effect.flip)
+  )
+
+  expect(ParseResult.isParseError(result)).toBe(true)
+})
+```
+
+### Rules
+1. **Use Effect.flip for error testing** (NOT Effect.either)
+2. **Tests use prototype layers directly** (ServiceName.Default)
+3. **Use ParseResult.isParseError(result)** for schema validation errors
+4. **Maintain >80% code coverage**
+5. **One test file per service**
+
+### Scripts
+- `bun test` - Run all tests
+- `bun test:watch` - Run tests in watch mode  
+- `bun test:coverage` - Run tests with coverage report
 
 ## Key Features to Implement
 
@@ -331,29 +395,37 @@ services:
 Always use `Effect.runPromise` or `Effect.runFork` at the application boundary:
 
 ```ts
-// Main application entry point
-import { Effect, Layer } from "effect"
+// Main application entry point - packages/backend/index.ts
+import { Effect } from "effect"
+import { ConfigService } from "./src/services/ConfigService.js"
 
 const program = Effect.gen(function* () {
-  // Your main application logic
-  yield* Effect.log("Starting scheduler...")
+  const config = yield* ConfigService
+  
+  yield* Effect.log(`Starting ${config.getAppName()} v${config.getVersion()}`)
+  yield* Effect.log(`Environment: ${config.getEnvironment()}`)
+  
+  return "Application started successfully"
 })
 
 // Build the complete layer with all services
-const MainLive = Layer.mergeAll(
-  DatabaseService.Default,
-  GoogleCalendarService.Default,
-  // ... other services
-)
+const MainLive = ConfigService.Default
 
-// Run the program
+// Run the program with proper error handling
 Effect.runPromise(
   program.pipe(
     Effect.provide(MainLive),
     Effect.catchAllCause(Effect.logError)
   )
-)
+).then(console.log)
 ```
+
+**Key Patterns:**
+- Use `Effect.gen` for readable async flow
+- Build layers with `ServiceName.Default` for prototype
+- Use `Effect.provide(MainLive)` to inject all services
+- Always include `Effect.catchAllCause(Effect.logError)` for error handling
+- Use `Effect.runPromise().then()` for final execution
 
 For more Bun-specific information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
 

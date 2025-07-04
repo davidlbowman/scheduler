@@ -8,7 +8,9 @@
 		"check": "bun run --filter backend check",
 		"typecheck": "bun run --filter backend typecheck",
 		"dev": "bun run --filter backend dev",
-		"test": "bun run --filter backend test"
+		"test": "bun run --filter backend test",
+		"test:watch": "bun run --filter backend test:watch",
+		"test:coverage": "bun run --filter backend test:coverage"
 	},
 	"workspaces": [
 		"packages/*"
