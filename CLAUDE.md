@@ -17,14 +17,15 @@ This is a self-hosted scheduling application built with Bun, Effect-TS, and Reac
 ## Current Development Status
 
 ### ✅ Completed
-- **ConfigService**: Basic configuration with sync constructor (app name, version, environment)
+- **ConfigService**: Type-safe environment variable loading with Effect's Config module
 - **TelemetryService**: ConsoleSpanExporter for prototype telemetry, depends on ConfigService
 - **Testing Infrastructure**: Bun test setup with >80% coverage requirement
 - **Project Structure**: Monorepo with workspace scripts and proper Effect patterns
+- **CLI Helper**: Interactive setup assistant (`bun run init`) for generating .env with Google OAuth credentials
 
-### 🚧 In Progress: Initialization & Environment Variables
+### 🚧 In Progress: Environment Schema Architecture
 
-**Goal**: Set up type-safe environment variable loading and CLI helper for `.env` generation.
+**Goal**: Define environment variable schema in ConfigService and reuse it in initialization CLI.
 
 **The Flow**:
 ```bash
@@ -40,21 +41,25 @@ bun dev
 ```
 
 **Architecture**:
-- **ConfigService**: Extend to use `Config.string()` for type-safe env vars with fallbacks
-- **CLI Helper**: Separate entry point (`packages/backend/init.ts`) that prompts for OAuth credentials and writes `.env`
-- **Environment Variables**: Google OAuth credentials, app configuration
+- **ConfigService**: Uses `Config.string()` for type-safe env vars with fallbacks
+- **CLI Helper**: Interactive tool (`packages/backend/init.ts`) that prompts for OAuth credentials
+- **Environment Schema**: Define once in ConfigService, import in CLI for consistency
 
 ### 🎯 Next Steps
 
-1. **Update ConfigService** - Add type-safe environment variable loading:
+1. **Define Environment Schema in ConfigService** - Create reusable schema:
    ```ts
-   const googleClientId = yield* Config.string("GOOGLE_CLIENT_ID")
-     .pipe(Config.withDefault("mock_client_id_for_development"))
-   const googleClientSecret = yield* Config.redacted("GOOGLE_CLIENT_SECRET")
-     .pipe(Config.withDefault("mock_secret_for_development")) 
+   export const EnvironmentSchema = Schema.Struct({
+     GOOGLE_CLIENT_ID: Schema.String,
+     GOOGLE_CLIENT_SECRET: Schema.String,
+     APP_NAME: Schema.String,
+     PORT: Schema.String,
+     JWT_SECRET: Schema.String,
+     // ... other env vars
+   })
    ```
 
-2. **Create CLI Helper** - Build `init.ts` with Effect CLI for interactive OAuth setup
+2. **Refactor CLI to Use Schema** - Import schema from ConfigService for consistency
 
 3. **Service Layer Progression**:
    - GoogleOAuthService (mock OAuth flow)
@@ -62,7 +67,7 @@ bun dev
    - SchedulerService (core booking logic)
    - HTTP API Service (booking endpoints)
 
-**Current Focus**: Solving the bootstrapping problem - how to get OAuth credentials into the app in a type-safe way without circular dependencies.
+**Current Focus**: Clean architecture for environment variable handling - define schema once, use everywhere.
 
 ## Bun-Specific Guidelines
 
