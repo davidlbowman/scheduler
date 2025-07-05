@@ -25,10 +25,11 @@ This is a self-hosted scheduling application built with Bun, Effect-TS, and Reac
 - **CLI Helper**: Interactive setup assistant (`bun run init`) for generating .env with Google OAuth credentials
 - **Environment Variable Loading**: ConfigService now loads all required env vars with type-safe defaults
 - **GoogleCalendarService**: Mock booking-focused calendar service with `getAvailableSlots()`, `bookSlot()`, and `checkAvailability()`
+- **EmailService**: Simple mock email service with `sendBookingConfirmation()`, `sendBookingCancellation()`, and `sendEmail()`
 
-### 🚧 In Progress: Email Service & HTTP API
+### 🚧 In Progress: HTTP API & Frontend
 
-**Goal**: Complete the mock service layer and build type-safe HTTP API endpoints.
+**Goal**: Complete the mock service layer with HTTP API endpoints, then build frontend prototype.
 
 **The Flow**:
 
@@ -46,49 +47,20 @@ bun dev
 
 **Architecture**:
 
-- **GoogleCalendarService**: Mock service for calendar operations (list events, create events, check availability)
-- **EmailService**: Mock service for sending email notifications (console.log in prototype)
-- **HttpApiService**: Type-safe API definitions using HttpApi, HttpApiGroup, and HttpApiEndpoint
-- **Handlers**: Separate handlers directory (`src/handlers/`) for clean separation of concerns
+- **GoogleCalendarService**: ✅ Mock service returning hardcoded available slots for booking
+- **EmailService**: ✅ Simple mock service for sending notifications (just logs and returns confirmation)
+- **HttpApiService**: 🚧 Type-safe API definitions using HttpApi, HttpApiGroup, and HttpApiEndpoint
+- **Handlers**: 🚧 Separate handlers directory (`src/handlers/`) for clean separation of concerns
 
 ### 🎯 Next Steps
 
-1. **Create GoogleCalendarService** - Mock implementation for calendar operations:
-
-   ```ts
-   export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>()(
-     "app/GoogleCalendarService",
-     {
-       succeed: {
-         checkAvailability: (start: Date, end: Date) => Effect.succeed(true),
-         createEvent: (event: CalendarEvent) => Effect.succeed({ id: "mock-123", ...event }),
-         listEvents: (date: Date) => Effect.succeed([])
-       }
-     }
-   ) {}
-   ```
-
-2. **Create EmailService** - Mock implementation for email notifications:
-
-   ```ts
-   export class EmailService extends Effect.Service<EmailService>()(
-     "app/EmailService",
-     {
-       succeed: {
-         sendBookingConfirmation: (to: string, event: CalendarEvent) => 
-           Effect.log(`Email sent to ${to}: Booking confirmed for ${event.title}`)
-       }
-     }
-   ) {}
-   ```
-
-3. **Create HttpApiService** - Define type-safe API endpoints:
+1. **Create HttpApiService** - Define type-safe API endpoints:
 
    ```ts
    export const api = HttpApi.empty.pipe(
      HttpApi.addGroup(
        HttpApiGroup.make("availability").pipe(
-         HttpApiGroup.add(HttpApiEndpoint.get("check", "/availability/:date"))
+         HttpApiGroup.add(HttpApiEndpoint.get("slots", "/availability/:weekStart"))
        ),
        HttpApiGroup.make("booking").pipe(
          HttpApiGroup.add(HttpApiEndpoint.post("create", "/booking"))
@@ -97,11 +69,16 @@ bun dev
    )
    ```
 
-4. **Create Handlers** - Implement API handlers in `src/handlers/`:
-   - `AvailabilityHandlers.ts` - Check calendar availability
-   - `BookingHandlers.ts` - Create bookings and send notifications
+2. **Create Handlers** - Implement API handlers in `src/handlers/`:
+   - `AvailabilityHandlers.ts` - Return available slots from GoogleCalendarService
+   - `BookingHandlers.ts` - Create bookings and send email notifications
 
-**Current Focus**: Building the mock service layer and HTTP API to enable frontend development.
+3. **Frontend Prototype** - Simple React calendar interface:
+   - Week view with available slots
+   - Booking form for guest details
+   - Success/error messaging
+
+**Current Focus**: Complete mock backend services, then build prototype frontend.
 
 ## Bun-Specific Guidelines
 
@@ -128,46 +105,64 @@ Default to using Bun instead of Node.js.
 
 **IMPORTANT**: Before implementing any actual integrations, we build a complete working prototype using mock implementations:
 
-### Phase 1: Mock Implementation
+### Phase 1: Mock Implementation ✅
 
-- **Environment Variables**: Use fake/hardcoded values
-- **Database**: Use localStorage or in-memory stores
-- **Google Calendar**: Mock API responses
-- **Email**: Use console.log or toast notifications
-- **Telemetry**: Use Effect's Console telemetry provider
-- **Authentication**: Mock OAuth flow with fake tokens
+- **Environment Variables**: Use fake/hardcoded values ✅
+- **Database**: Use localStorage or in-memory stores (pending)
+- **Google Calendar**: Mock API responses ✅
+- **Email**: Use console.log notifications ✅
+- **Telemetry**: Use Effect's Console telemetry provider ✅
+- **Authentication**: Mock OAuth flow with fake tokens (pending)
+
+### Phase 2: Frontend Prototype 🚧
+
+- **HTTP API**: Type-safe endpoints with mock handlers
+- **React UI**: Simple calendar week view with booking form
+- **State Management**: In-memory state for prototype
+- **End-to-End Flow**: Complete booking process without external dependencies
 
 ### Why Prototype First?
 
-1. Validate the complete service layer chain works end-to-end
-2. Test business logic without external dependencies
-3. Rapid iteration on API design and user flows
-4. Easy to demonstrate and test locally
+1. ✅ Validate the complete service layer chain works end-to-end
+2. ✅ Test business logic without external dependencies
+3. ✅ Rapid iteration on API design and user flows
+4. ✅ Easy to demonstrate and test locally
 
-### Mock Service Example
+### What We've Learned
+
+1. **Effect.Service Pattern**: `succeed: { method: () => Effect }` works perfectly for simple mocks
+2. **Schema Design**: Keep schemas minimal - use `Schema.Struct` over `Schema.Class` for data
+3. **Testing Strategy**: One test file per service with comprehensive coverage
+4. **Mock Simplicity**: Return hardcoded data, not complex logic - easier to reason about
+5. **Service Dependencies**: EmailService works independently, GoogleCalendarService provides data
+
+### Current Mock Strategy
 
 ```ts
-// Mock implementation for prototyping
-export const GoogleCalendarServiceMock = Layer.succeed(
-  GoogleCalendarService,
+// Simple mock service - just return hardcoded data
+export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>()(
+  "app/GoogleCalendarService",
   {
-    listEvents: () => Effect.succeed([
-      { id: "mock-1", title: "Team Meeting", start: new Date() },
-      { id: "mock-2", title: "1:1 with Manager", start: new Date() }
-    ]),
-    createEvent: (event) => Effect.gen(function* () {
-      yield* Effect.log(`Would create event: ${event.title}`)
-      return { id: `mock-${Date.now()}`, ...event }
-    })
+    succeed: {
+      getAvailableSlots: (weekStart: string) =>
+        Effect.gen(function* () {
+          yield* Effect.log(`Mock: Getting slots for ${weekStart}`)
+          return [
+            { start: "2025-07-07T09:00:00.000Z", end: "2025-07-07T09:30:00.000Z" },
+            { start: "2025-07-07T10:00:00.000Z", end: "2025-07-07T10:30:00.000Z" },
+            // ... more hardcoded slots
+          ]
+        })
+    }
   }
-)
+) {}
 
 // Switch to live implementation later
 export const GoogleCalendarServiceLive = Layer.effect(
   GoogleCalendarService,
   Effect.gen(function* () {
-    const config = yield* Config
-    // Real implementation here
+    const config = yield* ConfigService
+    // Real Google Calendar API calls here
   })
 )
 ```
