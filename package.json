@@ -3,6 +3,7 @@
 	"module": "index.ts",
 	"type": "module",
 	"scripts": {
+		"init": "bun run --filter backend --elide-lines=0 init",
 		"lint": "bunx biome lint --write .",
 		"format": "bunx biome format --write .",
 		"check": "bun run --filter backend check",

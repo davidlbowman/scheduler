@@ -10,6 +10,9 @@ describe("ConfigService", () => {
 				appName: config.getAppName(),
 				version: config.getVersion(),
 				environment: config.getEnvironment(),
+				port: config.getPort(),
+				googleClientId: config.getGoogleClientId(),
+				googleRedirectUri: config.getGoogleRedirectUri(),
 			};
 		});
 
@@ -19,7 +22,12 @@ describe("ConfigService", () => {
 
 		expect(result.appName).toBe("Scheduler");
 		expect(result.version).toBe("1.0.0-prototype");
-		expect(result.environment).toBe("development");
+		expect(result.environment).toBe("test"); // Bun sets NODE_ENV=test during test execution
+		expect(result.port).toBe(3000);
+		expect(result.googleClientId).toBe("mock_client_id_for_development");
+		expect(result.googleRedirectUri).toBe(
+			"http://localhost:3000/auth/callback",
+		);
 	});
 
 	test("should provide consistent values across multiple calls", async () => {
