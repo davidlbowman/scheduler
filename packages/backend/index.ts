@@ -2,33 +2,22 @@ import { Effect, Layer } from "effect";
 import { ConfigService } from "./src/services/ConfigService.js";
 import { TelemetryService } from "./src/services/TelemetryService.js";
 
+// Simple program that tests our basic services work
 const program = Effect.gen(function* () {
 	const config = yield* ConfigService;
 
-	const result = yield* Effect.gen(function* () {
-		yield* Effect.annotateCurrentSpan("appName", config.getAppName());
-		yield* Effect.annotateCurrentSpan("version", config.getVersion());
-		yield* Effect.annotateCurrentSpan("environment", config.getEnvironment());
+	yield* Effect.log(`${config.getAppName()} v${config.getVersion()}`);
+	yield* Effect.log(`Environment: ${config.getEnvironment()}`);
+	yield* Effect.log("All services loaded successfully!");
 
-		yield* Effect.log(
-			`Starting ${config.getAppName()} v${config.getVersion()}`,
-		);
-		yield* Effect.log(`Environment: ${config.getEnvironment()}`);
-
-		return "Application started successfully";
-	}).pipe(
-		Effect.withSpan("app-startup", {
-			attributes: {
-				"app.operation": "startup",
-				"app.name": config.getAppName(),
-				"app.version": config.getVersion(),
-				"app.environment": config.getEnvironment(),
-			},
-		}),
-	);
-
-	return result;
-});
+	return "Application started successfully";
+}).pipe(
+	Effect.withSpan("app-startup", {
+		attributes: {
+			"app.operation": "startup",
+		},
+	}),
+);
 
 const MainLive = Layer.mergeAll(
 	ConfigService.Default,

@@ -6,6 +6,7 @@
 	"scripts": {
 		"init": "bun run init.ts",
 		"dev": "bun run --watch index.ts",
+		"server": "bun run src/server.ts",
 		"check": "bunx biome check --write .",
 		"typecheck": "bunx tsc --noEmit",
 		"test": "bun test",
