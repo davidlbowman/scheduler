@@ -461,8 +461,10 @@ scheduler/
 
 **Root level scripts** (delegate to packages via `--filter`):
 
-- `bun dev` → `bun run --filter backend dev`
-- `bun test` → `bun run --filter backend test`
+- `bun dev` → Start backend server (port 8080) and frontend dev server (port 3000)
+- `bun test` → Run ALL tests (backend unit + E2E, requires servers running)
+- `bun test:backend` → Run only backend unit tests (fast, no servers needed)
+- `bun test:e2e` → Run only E2E tests (requires servers running)
 - `bun test:coverage` → `bun run --filter backend test:coverage`
 - `bun check` → `bun run --filter backend check`
 - `bun typecheck` → `bun run --filter backend typecheck`
@@ -521,16 +523,14 @@ export default function CalendarWeekView() {
 
 ## Testing
 
-### Structure
+### Backend Unit Tests (Bun Test)
 
+**Structure:**
 - Tests are located in `src/tests/` directory
 - One test file per service: `ServiceName.test.ts`
 - Use prototype layers for testing (no separate test layers)
 
-### Patterns
-
-#### Basic Service Test
-
+**Basic Service Test:**
 ```ts
 import { expect, test, describe } from "bun:test"
 import { Effect } from "effect"
@@ -553,8 +553,7 @@ describe("ServiceName", () => {
 })
 ```
 
-#### Error Testing with Effect.flip
-
+**Error Testing with Effect.flip:**
 ```ts
 test("should handle errors with Effect.flip", async () => {
   const program = Effect.gen(function* () {
@@ -571,19 +570,113 @@ test("should handle errors with Effect.flip", async () => {
 })
 ```
 
-### Rules
-
+**Backend Testing Rules:**
 1. **Use Effect.flip for error testing** (NOT Effect.either)
 2. **Tests use prototype layers directly** (ServiceName.Default)
 3. **Use ParseResult.isParseError(result)** for schema validation errors
 4. **Maintain >80% code coverage**
 5. **One test file per service**
 
-### Scripts
+### E2E Testing with Playwright
 
-- `bun test` - Run all tests
-- `bun test:watch` - Run tests in watch mode  
-- `bun test:coverage` - Run tests with coverage report
+**Implementation Status:** ✅ Complete with cross-browser testing (Chromium, Firefox, Mobile Chrome)
+
+**Playwright Best Practices (learned through implementation):**
+- **Test user-visible behavior** - Focus on what end users see and interact with
+- **Use semantic locators** - `getByRole()`, `getByText()` over CSS selectors
+- **Be specific with selectors** - Use exact text matches when multiple elements exist
+- **Auto-retrying assertions** - Use `await expect()` for web-first assertions
+- **Test isolation** - Clear localStorage and cookies in `beforeEach`
+- **Debug with screenshots** - Take temporary screenshots when tests fail unexpectedly
+
+**Working Test Structure:**
+```ts
+import { test, expect } from '@playwright/test'
+
+test.describe('Booking Flow', () => {
+  test.beforeEach(async ({ page }) => {
+    // Navigate first, then clear session data to avoid localStorage errors
+    await page.goto('http://localhost:3000')
+    await page.context().clearCookies()
+    await page.evaluate(() => localStorage.clear())
+  })
+
+  test('should display calendar view on homepage', async ({ page }) => {
+    await page.goto('http://localhost:3000')
+    
+    // Use getByText for non-semantic elements, getByRole for semantic ones
+    await expect(page.getByText('Schedule a Meeting')).toBeVisible()
+    await expect(page.getByRole('button', { name: /available/i })).toBeVisible()
+  })
+
+  test('should complete booking flow', async ({ page }) => {
+    await page.goto('http://localhost:3000')
+    
+    // Click time slot
+    await page.getByRole('button', { name: /9:00 AM/i }).click()
+    
+    // Fill booking form
+    await page.getByRole('textbox', { name: /email/i }).fill('guest@example.com')
+    await page.getByRole('button', { name: /book meeting/i }).click()
+    
+    // Be specific - use getByRole with exact name when multiple elements exist
+    await expect(page.getByRole('heading', { name: 'Booking Confirmed' })).toBeVisible()
+  })
+})
+```
+
+**Critical E2E Gotchas Learned:**
+1. **Navigate before localStorage** - Always `page.goto()` before `localStorage.clear()` to avoid security errors
+2. **Multiple element conflicts** - Use specific selectors like `getByRole('heading', { name: 'Booking Confirmed' })` not `getByText('Booking Confirmed')`
+3. **File naming** - Use `-e2e.ts` suffix to avoid Bun test runner conflicts
+4. **Browser dependencies** - Skip WebKit/Safari on systems missing graphics libraries
+
+**E2E Test Coverage:**
+- Calendar view display and time slot selection
+- Booking form validation and submission
+- Booking confirmation flow
+- Error handling and messaging
+- Cross-browser compatibility (Chromium, Firefox, Mobile Chrome)
+
+**Directory Structure:**
+```
+packages/backend/src/tests/     # Unit tests (Bun test runner)
+packages/frontend/e2e/          # E2E tests (Playwright test runner)  
+├── booking-e2e.ts             # Booking flow tests
+├── calendar-e2e.ts            # Calendar view tests
+└── playwright.config.ts       # Multi-browser test configuration
+```
+
+**Important:** E2E tests use `-e2e.ts` suffix to avoid conflict with Bun's test discovery pattern.
+
+### Test Scripts
+
+**Root Commands (run from project root):**
+- `bun run test` - Run ALL tests (backend + E2E, requires servers running)
+- `bun run test:backend` - Run only backend unit tests (fast, ~500ms)
+- `bun run test:e2e` - Run only E2E tests (requires servers running)
+
+**Frontend Commands (from packages/frontend):**
+- `bun test:e2e` - Run E2E tests (standard reporter)
+- `bun test:e2e:ui` - Run E2E tests with Playwright UI mode
+- `bun test:e2e:debug` - Run E2E tests in debug mode (opens browser)
+- `bun test:e2e --reporter=line` - Run with programmatic line output
+
+**Complete Test Workflows:**
+
+Quick backend-only testing:
+```bash
+bun test  # Just backend unit tests, no servers needed
+```
+
+Full testing (backend + E2E):
+```bash
+# Terminal 1: Start servers
+bun run dev
+
+# Terminal 2: Run all tests  
+bun run test
+```
 
 ## Key Features to Implement
 
