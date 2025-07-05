@@ -24,10 +24,11 @@ This is a self-hosted scheduling application built with Bun, Effect-TS, and Reac
 - **Project Structure**: Monorepo with workspace scripts and proper Effect patterns
 - **CLI Helper**: Interactive setup assistant (`bun run init`) for generating .env with Google OAuth credentials
 - **Environment Variable Loading**: ConfigService now loads all required env vars with type-safe defaults
+- **GoogleCalendarService**: Mock booking-focused calendar service with `getAvailableSlots()`, `bookSlot()`, and `checkAvailability()`
 
-### 🚧 In Progress: HTTP API & Mock Services
+### 🚧 In Progress: Email Service & HTTP API
 
-**Goal**: Build type-safe HTTP API with mocked Google Calendar and Email services.
+**Goal**: Complete the mock service layer and build type-safe HTTP API endpoints.
 
 **The Flow**:
 
