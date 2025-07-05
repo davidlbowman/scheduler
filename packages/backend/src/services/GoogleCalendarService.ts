@@ -12,7 +12,7 @@ export const BookingRequest = Schema.Struct({
 	summary: Schema.optional(Schema.String),
 });
 
-export const BookingConfirmation = Schema.Struct({
+export const BookingResponse = Schema.Struct({
 	id: Schema.String,
 	start: Schema.String,
 	end: Schema.String,
@@ -21,9 +21,7 @@ export const BookingConfirmation = Schema.Struct({
 
 export type AvailableSlot = Schema.Schema.Type<typeof AvailableSlot>;
 export type BookingRequest = Schema.Schema.Type<typeof BookingRequest>;
-export type BookingConfirmation = Schema.Schema.Type<
-	typeof BookingConfirmation
->;
+export type BookingResponse = Schema.Schema.Type<typeof BookingResponse>;
 
 export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>()(
 	"app/GoogleCalendarService",
@@ -85,7 +83,7 @@ export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>
 					];
 				}),
 
-			bookSlot: (request: BookingRequest) =>
+			bookSlot: (request: BookingRequest): Effect.Effect<BookingResponse> =>
 				Effect.gen(function* () {
 					yield* Effect.log(
 						`Mock: Booking slot at ${request.start} for ${request.guestEmail}`,

@@ -14,8 +14,18 @@ export const EmailConfirmation = Schema.Struct({
 	sentAt: Schema.String,
 });
 
+export const BookingConfirmation = Schema.Struct({
+	eventId: Schema.String,
+	start: Schema.String,
+	end: Schema.String,
+	guestName: Schema.optional(Schema.String),
+});
+
 export type EmailRequest = Schema.Schema.Type<typeof EmailRequest>;
 export type EmailConfirmation = Schema.Schema.Type<typeof EmailConfirmation>;
+export type BookingConfirmation = Schema.Schema.Type<
+	typeof BookingConfirmation
+>;
 
 export class EmailService extends Effect.Service<EmailService>()(
 	"app/EmailService",
