@@ -8,7 +8,7 @@ This is a self-hosted scheduling application built with Bun, Effect-TS, and Reac
 
 - **Runtime**: Bun (NOT Node.js)
 - **Backend**: Effect-TS with effect/platform for HTTP APIs
-- **Frontend**: React + TypeScript served via Bun
+- **Frontend**: Astro + TypeScript with shadcn/ui and Tailwind CSS 4
 - **UI Components**: shadcn/ui
 - **Linter**: Biome
 - **Database**: SQLite via bun:sqlite
@@ -26,10 +26,12 @@ This is a self-hosted scheduling application built with Bun, Effect-TS, and Reac
 - **Environment Variable Loading**: ConfigService now loads all required env vars with type-safe defaults
 - **GoogleCalendarService**: Mock booking-focused calendar service with `getAvailableSlots()`, `bookSlot()`, and `checkAvailability()`
 - **EmailService**: Simple mock email service with `sendBookingConfirmation()`, `sendBookingCancellation()`, and `sendEmail()`
+- **HttpApiService**: Type-safe API definitions using HttpApi, HttpApiGroup, and HttpApiEndpoint
+- **Backend Refactor**: Complete refactor of all services using proper Effect patterns and service definitions
 
-### 🚧 In Progress: HTTP API & Frontend
+### 🚧 In Progress: Frontend Development
 
-**Goal**: Complete the mock service layer with HTTP API endpoints, then build frontend prototype.
+**Goal**: Build Astro frontend with shadcn/ui components and Tailwind CSS 4, then connect to backend API.
 
 **The Flow**:
 
@@ -49,36 +51,39 @@ bun dev
 
 - **GoogleCalendarService**: ✅ Mock service returning hardcoded available slots for booking
 - **EmailService**: ✅ Simple mock service for sending notifications (just logs and returns confirmation)
-- **HttpApiService**: 🚧 Type-safe API definitions using HttpApi, HttpApiGroup, and HttpApiEndpoint
-- **Handlers**: 🚧 Separate handlers directory (`src/handlers/`) for clean separation of concerns
+- **HttpApiService**: ✅ Type-safe API definitions using HttpApi, HttpApiGroup, and HttpApiEndpoint
+- **Frontend**: 🚧 Astro site with shadcn/ui components and Tailwind CSS 4
+- **HttpClient**: 🚧 Service middleware for type-safe API communication
 
 ### 🎯 Next Steps
 
-1. **Create HttpApiService** - Define type-safe API endpoints:
-
+1. **Create HttpClient Service** - Type-safe HTTP client middleware:
    ```ts
-   export const api = HttpApi.empty.pipe(
-     HttpApi.addGroup(
-       HttpApiGroup.make("availability").pipe(
-         HttpApiGroup.add(HttpApiEndpoint.get("slots", "/availability/:weekStart"))
-       ),
-       HttpApiGroup.make("booking").pipe(
-         HttpApiGroup.add(HttpApiEndpoint.post("create", "/booking"))
-       )
-     )
-   )
+   export class HttpClientService extends Effect.Service<HttpClientService>()("app/HttpClientService", {
+     effect: Effect.gen(function* () {
+       // Type-safe HTTP client for API communication
+       return { get, post, put, delete: deleteRequest }
+     })
+   })
    ```
 
-2. **Create Handlers** - Implement API handlers in `src/handlers/`:
-   - `AvailabilityHandlers.ts` - Return available slots from GoogleCalendarService
-   - `BookingHandlers.ts` - Create bookings and send email notifications
+2. **Astro Frontend Setup** - Initialize Astro project with modern tooling:
+   - Create `packages/frontend/` with Astro + TypeScript
+   - Setup shadcn/ui components with Tailwind CSS 4
+   - Configure Astro for SSR/SSG hybrid rendering
 
-3. **Frontend Prototype** - Simple React calendar interface:
-   - Week view with available slots
-   - Booking form for guest details
-   - Success/error messaging
+3. **Core UI Components** - Build essential scheduling interface:
+   - `CalendarWeekView` - Week view with available time slots
+   - `BookingForm` - Guest booking form with validation
+   - `BookingConfirmation` - Success/error messaging
+   - `TimeSlotPicker` - Interactive time selection
 
-**Current Focus**: Complete mock backend services, then build prototype frontend.
+4. **API Integration** - Connect frontend to backend:
+   - Type-safe API client using HttpClient service
+   - Client-side state management for booking flow
+   - Error handling and loading states
+
+**Current Focus**: Build Astro frontend with shadcn/ui components and connect to backend API.
 
 ## Bun-Specific Guidelines
 
@@ -116,10 +121,12 @@ Default to using Bun instead of Node.js.
 
 ### Phase 2: Frontend Prototype 🚧
 
-- **HTTP API**: Type-safe endpoints with mock handlers
-- **React UI**: Simple calendar week view with booking form
-- **State Management**: In-memory state for prototype
-- **End-to-End Flow**: Complete booking process without external dependencies
+- **HTTP API**: ✅ Type-safe endpoints with Effect HttpApi
+- **HttpClient**: 🚧 Service middleware for type-safe API communication
+- **Astro Frontend**: 🚧 SSR/SSG hybrid with shadcn/ui components
+- **Calendar UI**: 🚧 Week view with time slot selection
+- **Booking Flow**: 🚧 Guest booking form with validation
+- **End-to-End Flow**: 🚧 Complete booking process without external dependencies
 
 ### Why Prototype First?
 
@@ -274,6 +281,56 @@ export class BookingHandlers extends Effect.Service<BookingHandlers>()(
 ) {}
 ```
 
+### HttpClient Service Pattern
+
+For type-safe API communication between frontend and backend:
+
+```ts
+import { HttpClient } from "@effect/platform"
+import { Schema } from "@effect/schema"
+
+// Define API schemas
+const BookingRequest = Schema.Struct({
+  guestEmail: Schema.String,
+  startTime: Schema.DateTimeUtc,
+  duration: Schema.Number
+})
+
+const BookingResponse = Schema.Struct({
+  eventId: Schema.String,
+  status: Schema.String
+})
+
+// HttpClient service for API communication
+export class ApiClientService extends Effect.Service<ApiClientService>()(
+  "app/ApiClientService",
+  {
+    effect: Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient
+      
+      const createBooking = (request: typeof BookingRequest.Type) =>
+        client.post("/api/booking").pipe(
+          HttpClient.schemaBodyJson(BookingRequest),
+          HttpClient.schemaBodyJson(request),
+          HttpClient.schemaJson(BookingResponse),
+          Effect.scoped
+        )
+      
+      const getAvailableSlots = (weekStart: string) =>
+        client.get(`/api/availability/${weekStart}`).pipe(
+          HttpClient.schemaJson(Schema.Array(Schema.Struct({
+            start: Schema.DateTimeUtc,
+            end: Schema.DateTimeUtc
+          }))),
+          Effect.scoped
+        )
+      
+      return { createBooking, getAvailableSlots }
+    })
+  }
+) {}
+```
+
 ### Error Handling
 
 Define typed errors using `Schema.TaggedError` for better integration:
@@ -373,20 +430,29 @@ scheduler/
 ├── packages/
 │   ├── backend/           # Effect-TS backend services
 │   │   ├── src/
-│   │   │   ├── services/  # Effect service layers
-│   │   │   ├── tests/     # Service tests
-│   │   │   ├── api/       # HTTP API definitions
-│   │   │   └── schemas/   # Shared schemas
+│   │   │   ├── services/  # Effect service layers (✅ Complete)
+│   │   │   │   ├── ConfigService.ts
+│   │   │   │   ├── EmailService.ts
+│   │   │   │   ├── GoogleCalendarService.ts
+│   │   │   │   ├── HttpApiService.ts
+│   │   │   │   └── TelemetryService.ts
+│   │   │   └── tests/     # Service tests (✅ Complete)
 │   │   ├── index.ts       # Entry point
+│   │   ├── init.ts        # CLI helper
 │   │   └── package.json
-│   ├── frontend/          # React frontend
+│   ├── frontend/          # Astro frontend (🚧 Planned)
 │   │   ├── src/
-│   │   │   ├── components/
-│   │   │   └── app.tsx
+│   │   │   ├── components/     # shadcn/ui components
+│   │   │   ├── layouts/        # Astro layouts
+│   │   │   ├── pages/          # Astro pages
+│   │   │   └── lib/            # Utilities
+│   │   ├── astro.config.mjs
+│   │   ├── tailwind.config.js
 │   │   └── package.json
 │   └── shared/            # Shared types and schemas
 │       └── src/
 ├── biome.json             # Linter configuration
+├── CLAUDE.md              # Development guidelines
 ├── package.json           # Root workspace config
 └── docker-compose.yml
 ```
@@ -401,47 +467,56 @@ scheduler/
 - `bun check` → `bun run --filter backend check`
 - `bun typecheck` → `bun run --filter backend typecheck`
 
-## Frontend with Bun
+## Frontend with Astro
 
-For the prototype, use Bun's built-in server with HTML imports:
+For the prototype, use Astro with Bun for fast development:
 
 ```ts
-// packages/frontend/src/server.ts
-import { Bun } from "bun"
+// packages/frontend/astro.config.mjs
+import { defineConfig } from 'astro/config'
+import tailwind from '@astrojs/tailwind'
+import react from '@astrojs/react'
 
-Bun.serve({
-  port: 3000,
-  async fetch(req) {
-    const url = new URL(req.url)
-    
-    // Serve static files
-    if (url.pathname === "/") {
-      return new Response(Bun.file("./index.html"))
-    }
-    
-    // Proxy API requests to backend
-    if (url.pathname.startsWith("/api")) {
-      // In prototype, return mock data
-      return Response.json({ mock: true })
-    }
-    
-    return new Response("Not Found", { status: 404 })
+export default defineConfig({
+  integrations: [tailwind(), react()],
+  output: 'hybrid',
+  adapter: import('@astrojs/node'),
+  server: {
+    port: 3000,
+    host: true
   }
 })
 ```
 
-```html
-<!-- packages/frontend/index.html -->
-<!DOCTYPE html>
-<html>
-  <head>
-    <script src="https://cdn.tailwindcss.com"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="./src/app.tsx"></script>
-  </body>
-</html>
+```astro
+---
+// packages/frontend/src/pages/index.astro
+import Layout from '../layouts/Layout.astro'
+import CalendarWeekView from '../components/CalendarWeekView.tsx'
+---
+
+<Layout title="Scheduler">
+  <main class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-8">Schedule a Meeting</h1>
+    <CalendarWeekView client:load />
+  </main>
+</Layout>
+```
+
+```tsx
+// packages/frontend/src/components/CalendarWeekView.tsx
+import { useState } from 'react'
+import { Button } from './ui/button'
+
+export default function CalendarWeekView() {
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
+  
+  return (
+    <div className="grid grid-cols-7 gap-4">
+      {/* Time slots grid */}
+    </div>
+  )
+}
 ```
 
 ## Testing
