@@ -6,6 +6,9 @@ out
 dist
 *.tgz
 
+# astro
+.astro/
+
 # code coverage
 coverage
 *.lcov
