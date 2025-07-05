@@ -51,7 +51,19 @@ export class EmailService extends Effect.Service<EmailService>()(
 						subject: "Booking Confirmation - Your meeting is scheduled",
 						sentAt: new Date().toISOString(),
 					};
-				}),
+				}).pipe(
+					Effect.withSpan("EmailService.sendBookingConfirmation", {
+						attributes: {
+							"service.name": "EmailService",
+							"operation.name": "sendBookingConfirmation",
+							"operation.type": "notification",
+							"email.to": guestEmail,
+							"email.type": "booking_confirmation",
+							"booking.eventId": bookingDetails.eventId,
+							"booking.guestName": bookingDetails.guestName || "unknown",
+						},
+					}),
+				),
 
 			sendBookingCancellation: (
 				guestEmail: string,
@@ -72,7 +84,19 @@ export class EmailService extends Effect.Service<EmailService>()(
 						subject: "Meeting Cancelled",
 						sentAt: new Date().toISOString(),
 					};
-				}),
+				}).pipe(
+					Effect.withSpan("EmailService.sendBookingCancellation", {
+						attributes: {
+							"service.name": "EmailService",
+							"operation.name": "sendBookingCancellation",
+							"operation.type": "notification",
+							"email.to": guestEmail,
+							"email.type": "booking_cancellation",
+							"booking.eventId": bookingDetails.eventId,
+							"booking.guestName": bookingDetails.guestName || "unknown",
+						},
+					}),
+				),
 
 			sendEmail: (request: EmailRequest) =>
 				Effect.gen(function* () {
@@ -86,7 +110,19 @@ export class EmailService extends Effect.Service<EmailService>()(
 						subject: request.subject,
 						sentAt: new Date().toISOString(),
 					};
-				}),
+				}).pipe(
+					Effect.withSpan("EmailService.sendEmail", {
+						attributes: {
+							"service.name": "EmailService",
+							"operation.name": "sendEmail",
+							"operation.type": "notification",
+							"email.to": request.to,
+							"email.subject": request.subject,
+							"email.type": "generic",
+							"email.format": request.isHtml ? "html" : "text",
+						},
+					}),
+				),
 		},
 	},
 ) {}

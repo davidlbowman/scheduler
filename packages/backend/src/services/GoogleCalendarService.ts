@@ -43,45 +43,54 @@ export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>
 						{
 							start: new Date(
 								nextMonday.getTime() + 9 * 60 * 60 * 1000,
-							).toISOString(), // Monday 9:00 AM
+							).toISOString(),
 							end: new Date(
 								nextMonday.getTime() + 9.5 * 60 * 60 * 1000,
-							).toISOString(), // Monday 9:30 AM
+							).toISOString(),
 						},
 						{
 							start: new Date(
 								nextMonday.getTime() + 10 * 60 * 60 * 1000,
-							).toISOString(), // Monday 10:00 AM
+							).toISOString(),
 							end: new Date(
 								nextMonday.getTime() + 10.5 * 60 * 60 * 1000,
-							).toISOString(), // Monday 10:30 AM
+							).toISOString(),
 						},
 						{
 							start: new Date(
 								nextMonday.getTime() +
 									24 * 60 * 60 * 1000 +
 									14 * 60 * 60 * 1000,
-							).toISOString(), // Tuesday 2:00 PM
+							).toISOString(),
 							end: new Date(
 								nextMonday.getTime() +
 									24 * 60 * 60 * 1000 +
 									14.5 * 60 * 60 * 1000,
-							).toISOString(), // Tuesday 2:30 PM
+							).toISOString(),
 						},
 						{
 							start: new Date(
 								nextMonday.getTime() +
 									48 * 60 * 60 * 1000 +
 									11 * 60 * 60 * 1000,
-							).toISOString(), // Wednesday 11:00 AM
+							).toISOString(),
 							end: new Date(
 								nextMonday.getTime() +
 									48 * 60 * 60 * 1000 +
 									11.5 * 60 * 60 * 1000,
-							).toISOString(), // Wednesday 11:30 AM
+							).toISOString(),
 						},
 					];
-				}),
+				}).pipe(
+					Effect.withSpan("GoogleCalendarService.getAvailableSlots", {
+						attributes: {
+							"service.name": "GoogleCalendarService",
+							"operation.name": "getAvailableSlots",
+							"operation.type": "query",
+							"calendar.weekStart": weekStart,
+						},
+					}),
+				),
 
 			bookSlot: (request: BookingRequest): Effect.Effect<BookingResponse> =>
 				Effect.gen(function* () {
@@ -90,7 +99,7 @@ export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>
 					);
 
 					const slotStart = new Date(request.start);
-					const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000); // 30 minutes
+					const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000);
 
 					return {
 						id: `booking-${Date.now()}`,
@@ -98,15 +107,36 @@ export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>
 						end: slotEnd.toISOString(),
 						guestEmail: request.guestEmail,
 					};
-				}),
+				}).pipe(
+					Effect.withSpan("GoogleCalendarService.bookSlot", {
+						attributes: {
+							"service.name": "GoogleCalendarService",
+							"operation.name": "bookSlot",
+							"operation.type": "mutation",
+							"booking.start": request.start,
+							"booking.guestEmail": request.guestEmail,
+							"booking.guestName": request.guestName || "unknown",
+							"booking.duration": "30",
+						},
+					}),
+				),
 
 			checkAvailability: (start: string) =>
 				Effect.gen(function* () {
 					yield* Effect.log(`Mock: Checking availability at ${start}`);
 
 					const slotStart = new Date(start);
-					return slotStart > new Date(); // Just check if it's in the future
-				}),
+					return slotStart > new Date();
+				}).pipe(
+					Effect.withSpan("GoogleCalendarService.checkAvailability", {
+						attributes: {
+							"service.name": "GoogleCalendarService",
+							"operation.name": "checkAvailability",
+							"operation.type": "query",
+							"availability.start": start,
+						},
+					}),
+				),
 		},
 	},
 ) {}

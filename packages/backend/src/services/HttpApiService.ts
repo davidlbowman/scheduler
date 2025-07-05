@@ -43,7 +43,16 @@ const AvailabilityHandlers = HttpApiBuilder.group(
 				const calendar = yield* GoogleCalendarService;
 				const slots = yield* calendar.getAvailableSlots(path.weekStart);
 				return slots;
-			}),
+			}).pipe(
+				Effect.withSpan("HttpApiService.getSlots", {
+					attributes: {
+						"http.method": "GET",
+						"http.route": "/availability/:weekStart",
+						"operation.name": "getSlots",
+						"operation.type": "http_handler",
+					},
+				}),
+			),
 		),
 );
 
@@ -71,7 +80,16 @@ const BookingHandlers = HttpApiBuilder.group(
 					end: booking.end,
 					guestEmail: booking.guestEmail,
 				};
-			}),
+			}).pipe(
+				Effect.withSpan("HttpApiService.createBooking", {
+					attributes: {
+						"http.method": "POST",
+						"http.route": "/booking",
+						"operation.name": "createBooking",
+						"operation.type": "http_handler",
+					},
+				}),
+			),
 		),
 );
 
