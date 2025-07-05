@@ -13,22 +13,12 @@ import {
 	GoogleCalendarService,
 } from "@/services/GoogleCalendarService.js";
 
-// API-specific schemas
 export const GetSlotsParams = Schema.Struct({
 	weekStart: Schema.String,
 });
 
 export type GetSlotsParams = Schema.Schema.Type<typeof GetSlotsParams>;
 
-export type { BookingConfirmation } from "@/services/EmailService.js";
-// Re-export types for convenience
-export type {
-	AvailableSlot,
-	BookingRequest,
-	BookingResponse,
-} from "@/services/GoogleCalendarService.js";
-
-// API Definition
 const getSlots = HttpApiEndpoint.get("getSlots", "/availability/:weekStart")
 	.setPath(GetSlotsParams)
 	.addSuccess(Schema.Array(AvailableSlot));
@@ -44,7 +34,6 @@ export const SchedulerApi = HttpApi.make("SchedulerApi")
 	.add(availability)
 	.add(booking);
 
-// Handlers
 const AvailabilityHandlers = HttpApiBuilder.group(
 	SchedulerApi,
 	"availability",
@@ -67,10 +56,8 @@ const BookingHandlers = HttpApiBuilder.group(
 				const calendar = yield* GoogleCalendarService;
 				const email = yield* EmailService;
 
-				// Book the slot
 				const booking = yield* calendar.bookSlot(payload);
 
-				// Send confirmation email
 				yield* email.sendBookingConfirmation(payload.guestEmail, {
 					eventId: booking.id,
 					start: booking.start,
@@ -88,7 +75,6 @@ const BookingHandlers = HttpApiBuilder.group(
 		),
 );
 
-// HttpApiService - provides the complete API with handlers as a Layer
 export const HttpApiService = HttpApiBuilder.api(SchedulerApi).pipe(
 	Layer.provide(Layer.mergeAll(AvailabilityHandlers, BookingHandlers)),
 );
