@@ -17,17 +17,20 @@ This is a self-hosted scheduling application built with Bun, Effect-TS, and Reac
 ## Current Development Status
 
 ### ✅ Completed
-- **ConfigService**: Type-safe environment variable loading with Effect's Config module
+
+- **ConfigService**: Type-safe environment variable loading with `Config.string()`, `Config.redacted()`, and fallback defaults
 - **TelemetryService**: ConsoleSpanExporter for prototype telemetry, depends on ConfigService
 - **Testing Infrastructure**: Bun test setup with >80% coverage requirement
 - **Project Structure**: Monorepo with workspace scripts and proper Effect patterns
 - **CLI Helper**: Interactive setup assistant (`bun run init`) for generating .env with Google OAuth credentials
+- **Environment Variable Loading**: ConfigService now loads all required env vars with type-safe defaults
 
-### 🚧 In Progress: Environment Schema Architecture
+### 🚧 In Progress: HTTP API & Mock Services
 
-**Goal**: Define environment variable schema in ConfigService and reuse it in initialization CLI.
+**Goal**: Build type-safe HTTP API with mocked Google Calendar and Email services.
 
 **The Flow**:
+
 ```bash
 # 1. Clone repo and setup
 git clone scheduler && cd scheduler
@@ -41,33 +44,63 @@ bun dev
 ```
 
 **Architecture**:
-- **ConfigService**: Uses `Config.string()` for type-safe env vars with fallbacks
-- **CLI Helper**: Interactive tool (`packages/backend/init.ts`) that prompts for OAuth credentials
-- **Environment Schema**: Define once in ConfigService, import in CLI for consistency
+
+- **GoogleCalendarService**: Mock service for calendar operations (list events, create events, check availability)
+- **EmailService**: Mock service for sending email notifications (console.log in prototype)
+- **HttpApiService**: Type-safe API definitions using HttpApi, HttpApiGroup, and HttpApiEndpoint
+- **Handlers**: Separate handlers directory (`src/handlers/`) for clean separation of concerns
 
 ### 🎯 Next Steps
 
-1. **Define Environment Schema in ConfigService** - Create reusable schema:
+1. **Create GoogleCalendarService** - Mock implementation for calendar operations:
+
    ```ts
-   export const EnvironmentSchema = Schema.Struct({
-     GOOGLE_CLIENT_ID: Schema.String,
-     GOOGLE_CLIENT_SECRET: Schema.String,
-     APP_NAME: Schema.String,
-     PORT: Schema.String,
-     JWT_SECRET: Schema.String,
-     // ... other env vars
-   })
+   export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>()(
+     "app/GoogleCalendarService",
+     {
+       succeed: {
+         checkAvailability: (start: Date, end: Date) => Effect.succeed(true),
+         createEvent: (event: CalendarEvent) => Effect.succeed({ id: "mock-123", ...event }),
+         listEvents: (date: Date) => Effect.succeed([])
+       }
+     }
+   ) {}
    ```
 
-2. **Refactor CLI to Use Schema** - Import schema from ConfigService for consistency
+2. **Create EmailService** - Mock implementation for email notifications:
 
-3. **Service Layer Progression**:
-   - GoogleOAuthService (mock OAuth flow)
-   - GoogleCalendarService (mock calendar operations) 
-   - SchedulerService (core booking logic)
-   - HTTP API Service (booking endpoints)
+   ```ts
+   export class EmailService extends Effect.Service<EmailService>()(
+     "app/EmailService",
+     {
+       succeed: {
+         sendBookingConfirmation: (to: string, event: CalendarEvent) => 
+           Effect.log(`Email sent to ${to}: Booking confirmed for ${event.title}`)
+       }
+     }
+   ) {}
+   ```
 
-**Current Focus**: Clean architecture for environment variable handling - define schema once, use everywhere.
+3. **Create HttpApiService** - Define type-safe API endpoints:
+
+   ```ts
+   export const api = HttpApi.empty.pipe(
+     HttpApi.addGroup(
+       HttpApiGroup.make("availability").pipe(
+         HttpApiGroup.add(HttpApiEndpoint.get("check", "/availability/:date"))
+       ),
+       HttpApiGroup.make("booking").pipe(
+         HttpApiGroup.add(HttpApiEndpoint.post("create", "/booking"))
+       )
+     )
+   )
+   ```
+
+4. **Create Handlers** - Implement API handlers in `src/handlers/`:
+   - `AvailabilityHandlers.ts` - Check calendar availability
+   - `BookingHandlers.ts` - Create bookings and send notifications
+
+**Current Focus**: Building the mock service layer and HTTP API to enable frontend development.
 
 ## Bun-Specific Guidelines
 
@@ -581,3 +614,40 @@ Effect.gen(function* () {
 - Use `Effect.runPromise` at the application boundary
 
 For more Bun-specific information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
+
+## Backlog
+
+Future enhancements to consider after the prototype is complete:
+
+1. **Database Integration**:
+   - Migrate from in-memory to SQLite using bun:sqlite
+   - Store user preferences, booking history, and availability rules
+
+2. **Authentication**:
+   - Implement real Google OAuth 2.0 flow
+   - JWT session management
+   - Role-based access control
+
+3. **Advanced Scheduling**:
+   - Recurring availability patterns
+   - Buffer time between meetings
+   - Time zone handling
+   - Working hours configuration
+
+4. **Integration Features**:
+   - Real Google Calendar API integration
+   - Email service integration (SendGrid/AWS SES)
+   - Webhook support for external systems
+   - iCal feed generation
+
+5. **UI Enhancements**:
+   - Calendar widget for availability selection
+   - Admin dashboard for managing bookings
+   - Customizable booking forms
+   - Email template editor
+
+6. **Performance & Monitoring**:
+   - Real telemetry with OpenTelemetry export
+   - Rate limiting
+   - Caching layer
+   - Health check endpoints
