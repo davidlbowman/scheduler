@@ -5,8 +5,7 @@
 	"private": true,
 	"scripts": {
 		"init": "bun run init.ts",
-		"dev": "bun run --watch index.ts",
-		"server": "bun run src/server.ts",
+		"dev": "bun run --watch src/index.ts",
 		"check": "bunx biome check --write .",
 		"typecheck": "bunx tsc --noEmit",
 		"test": "bun test",
