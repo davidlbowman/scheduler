@@ -1,20 +1,21 @@
 import { Effect, Schema } from "effect";
 
-export class CalendarEvent extends Schema.Class<CalendarEvent>("CalendarEvent")(
-	{
-		id: Schema.String,
-		summary: Schema.String,
-		description: Schema.optional(Schema.String),
-		start: Schema.String,
-		end: Schema.String,
-		attendees: Schema.optional(Schema.Array(Schema.String)),
-	},
-) {}
-
-export class TimeSlot extends Schema.Class<TimeSlot>("TimeSlot")({
+export const CalendarEvent = Schema.Struct({
+	id: Schema.String,
+	summary: Schema.String,
+	description: Schema.optional(Schema.String),
 	start: Schema.String,
 	end: Schema.String,
-}) {}
+	attendees: Schema.optional(Schema.Array(Schema.String)),
+});
+
+export const TimeSlot = Schema.Struct({
+	start: Schema.String,
+	end: Schema.String,
+});
+
+export type CalendarEvent = Schema.Schema.Type<typeof CalendarEvent>;
+export type TimeSlot = Schema.Schema.Type<typeof TimeSlot>;
 
 export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>()(
 	"app/GoogleCalendarService",
@@ -32,20 +33,20 @@ export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>
 					tomorrow.setDate(tomorrow.getDate() + 1);
 
 					events.push(
-						new CalendarEvent({
+						{
 							id: "mock-1",
 							summary: "Team Meeting",
 							start: new Date(now.getTime() + 3600000).toISOString(), // 1 hour from now
 							end: new Date(now.getTime() + 5400000).toISOString(), // 1.5 hours from now
-						}),
-						new CalendarEvent({
+						},
+						{
 							id: "mock-2",
 							summary: "Client Call",
 							description: "Quarterly review",
 							start: tomorrow.toISOString(),
 							end: new Date(tomorrow.getTime() + 3600000).toISOString(),
 							attendees: ["client@example.com"],
-						}),
+						},
 					);
 
 					return events.filter((event) => {
@@ -60,10 +61,10 @@ export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>
 				Effect.gen(function* () {
 					yield* Effect.log(`Mock: Creating event "${event.summary}"`);
 
-					return new CalendarEvent({
+					return {
 						...event,
 						id: `mock-${Date.now()}`,
-					});
+					};
 				}),
 
 			getBusyTimes: (timeMin: string, timeMax: string) =>
@@ -82,12 +83,10 @@ export class GoogleCalendarService extends Effect.Service<GoogleCalendarService>
 						busyStart >= new Date(timeMin) &&
 						busyStart <= new Date(timeMax)
 					) {
-						busySlots.push(
-							new TimeSlot({
-								start: busyStart.toISOString(),
-								end: busyEnd.toISOString(),
-							}),
-						);
+						busySlots.push({
+							start: busyStart.toISOString(),
+							end: busyEnd.toISOString(),
+						});
 					}
 
 					return busySlots;
